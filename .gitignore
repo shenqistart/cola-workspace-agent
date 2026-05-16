@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+.vite
+.turbo
+.DS_Store
+.env
+.env.*
+!.env.example
+.omx
+*.tsbuildinfo
