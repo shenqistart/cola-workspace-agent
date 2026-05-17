@@ -1,5 +1,5 @@
 import { Activity, Check, Clock, RotateCcw } from "lucide-react";
-import { describeOperation } from "../agent/patchProtocol";
+import { describeOperation, describeOperationDetails } from "../agent/patchProtocol";
 import { useCanvasStore } from "../store/useCanvasStore";
 import { formatTime } from "../utils/time";
 
@@ -52,10 +52,14 @@ export function Timeline() {
                 {formatTime(entry.createdAt)}
               </span>
             </div>
-            <p className="mt-1 text-xs leading-5 text-[#52637d]">{entry.description}</p>
-            <p className="mt-2 text-[11px] text-[#63718a]">
-              {entry.operations.length} operation(s)
+            <p className="mt-1 text-xs font-medium leading-5 text-[#52637d]">
+              Agent · {entry.description}
             </p>
+            <ul className="mt-2 space-y-1 text-[11px] leading-5 text-[#63718a]">
+              {entry.operations.flatMap(describeOperationDetails).map((detail, index) => (
+                <li key={`${entry.id}-${detail}-${index}`}>- {detail}</li>
+              ))}
+            </ul>
           </article>
         ))}
 

@@ -29,6 +29,7 @@ Use these prompts from the left chat panel:
 帮我画一个用户注册的流程图，包含邮箱验证和手机验证两条路径
 把手机验证那条路径加一个短信发送失败的重试逻辑
 把邮箱验证路径加一个验证码过期判断
+测试失败回滚
 ```
 
 Recommended interview walkthrough:
@@ -47,6 +48,11 @@ Recommended interview walkthrough:
 - `src/agent/patchApplier.ts` applies patch operations and enforces manual layout protection.
 - `src/store/useCanvasStore.ts` coordinates optimistic patch application, rollback, undo, redo, messages, and timelines.
 - `src/components` renders the chat panel, React Flow workspace, inspector, timeline, and patch preview.
+
+## Design Docs
+
+- [Interaction design](docs/interaction-design.md)
+- [Architecture design notes](docs/design-notes.md)
 
 ## Agent Patch Protocol
 

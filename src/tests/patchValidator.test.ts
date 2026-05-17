@@ -82,4 +82,24 @@ describe("patch validator", () => {
       expect(result.errors.join("\n")).toContain('edge target "node_missing" does not exist');
     }
   });
+
+  it("rejects empty batch operations", () => {
+    const snapshot = createEmptyCanvasSnapshot();
+    const patch: AgentPatch = {
+      id: "patch_empty_batch",
+      description: "Empty batch",
+      baseVersion: snapshot.version,
+      affectedBlockIds: [],
+      operations: [{ op: "batch", operations: [] }],
+      createdAt: Date.now(),
+    };
+
+    const result = validateAgentPatch(patch, snapshot);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.join("\n")).toContain(
+        "batch must contain at least one operation",
+      );
+    }
+  });
 });

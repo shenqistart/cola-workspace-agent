@@ -51,20 +51,35 @@ export interface AgentPatch {
 export function describeOperation(operation: PatchOperation) {
   switch (operation.op) {
     case "createBlock":
-      return `Create block ${operation.block.id}`;
+      return `createBlock ${operation.block.id}`;
     case "updateBlock":
-      return `Update block ${operation.id}`;
+      return `updateBlock ${operation.id}`;
     case "deleteBlock":
-      return `Delete block ${operation.id}`;
+      return `deleteBlock ${operation.id}`;
     case "createEdge":
-      return `Create edge ${operation.edge.id}`;
+      return `createEdge ${operation.edge.id}`;
     case "deleteEdge":
-      return `Delete edge ${operation.id}`;
+      return `deleteEdge ${operation.id}`;
     case "moveBlock":
-      return `Move block ${operation.id}`;
+      return `moveBlock ${operation.id}`;
     case "insertAfter":
-      return `Insert ${operation.blocks.length} block(s) after ${operation.anchorId}`;
+      return `insertAfter ${operation.anchorId}`;
     case "batch":
-      return `Batch ${operation.operations.length} operation(s)`;
+      return `batch ${operation.operations.length} operation(s)`;
+  }
+}
+
+export function describeOperationDetails(operation: PatchOperation): string[] {
+  switch (operation.op) {
+    case "insertAfter":
+      return [
+        `insertAfter ${operation.anchorId}`,
+        ...operation.blocks.map((block) => `create ${block.id}`),
+        ...operation.edges.map((edge) => `createEdge ${edge.id}`),
+      ];
+    case "batch":
+      return operation.operations.flatMap(describeOperationDetails);
+    default:
+      return [describeOperation(operation)];
   }
 }

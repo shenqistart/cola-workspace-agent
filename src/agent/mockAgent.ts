@@ -8,11 +8,13 @@ const initialInstruction =
   "帮我画一个用户注册的流程图，包含邮箱验证和手机验证两条路径";
 const phoneRetryInstruction = "把手机验证那条路径加一个短信发送失败的重试逻辑";
 const emailExpiryInstruction = "把邮箱验证路径加一个验证码过期判断";
+const rollbackTestInstruction = "测试失败回滚";
 
 export const examplePrompts = [
   initialInstruction,
   phoneRetryInstruction,
   emailExpiryInstruction,
+  rollbackTestInstruction,
 ];
 
 export async function createMockAgentPatch(
@@ -20,6 +22,10 @@ export async function createMockAgentPatch(
   snapshot: CanvasSnapshot,
 ): Promise<AgentPatch> {
   const normalizedPrompt = prompt.trim();
+
+  if (normalizedPrompt.includes("测试失败回滚")) {
+    return createRollbackTestPatch(snapshot);
+  }
 
   if (
     normalizedPrompt.includes("注册") ||
@@ -169,9 +175,15 @@ function createRegistrationFlowPatch(snapshot: CanvasSnapshot): AgentPatch {
 
 function createPhoneRetryPatch(snapshot: CanvasSnapshot): AgentPatch {
   const phoneNode = findNode(snapshot, "node_phone_verify");
-  const completeNode = findNode(snapshot, "node_complete");
   const anchor = phoneNode?.position ?? { x: 740, y: 220 };
-  const complete = completeNode?.position ?? { x: 980, y: 120 };
+
+  if (snapshot.blocks.node_sms_failed_decision || snapshot.blocks.node_sms_retry) {
+    return createNoOpPatch(
+      snapshot,
+      "手机验证分支已包含短信发送失败重试逻辑",
+      "该分支已经包含对应逻辑，无需重复添加。",
+    );
+  }
 
   const failedDecision = createFlowNode({
     id: "node_sms_failed_decision",
@@ -240,20 +252,12 @@ function createPhoneRetryPatch(snapshot: CanvasSnapshot): AgentPatch {
     operations.push({ op: "deleteEdge", id: "edge_phone_complete" });
   }
   operations.push({
-      op: "insertAfter",
-      anchorId: "node_phone_verify",
-      blocks: phoneBlocks,
-      edges: phoneEdges,
-      layoutScope: "branch",
-    });
-  operations.push({
-      op: "updateBlock",
-      id: "node_complete",
-      patch: {
-        position: { x: Math.max(complete.x, anchor.x + 520), y: complete.y },
-        positionSource: "layout",
-      },
-    });
+    op: "insertAfter",
+    anchorId: "node_phone_verify",
+    blocks: phoneBlocks,
+    edges: phoneEdges,
+    layoutScope: "branch",
+  });
 
   return {
     id: createId("patch_phone_retry"),
@@ -263,7 +267,6 @@ function createPhoneRetryPatch(snapshot: CanvasSnapshot): AgentPatch {
       "node_phone_verify",
       "node_sms_failed_decision",
       "node_sms_retry",
-      "node_complete",
     ],
     operations,
     createdAt: now(),
@@ -274,6 +277,14 @@ function createPhoneRetryPatch(snapshot: CanvasSnapshot): AgentPatch {
 function createEmailExpiryPatch(snapshot: CanvasSnapshot): AgentPatch {
   const emailNode = findNode(snapshot, "node_email_verify");
   const anchor = emailNode?.position ?? { x: 740, y: 28 };
+
+  if (snapshot.blocks.node_email_code_expired || snapshot.blocks.node_email_resend_code) {
+    return createNoOpPatch(
+      snapshot,
+      "邮箱验证分支已包含验证码过期判断",
+      "该分支已经包含对应逻辑，无需重复添加。",
+    );
+  }
 
   const expiryDecision = createFlowNode({
     id: "node_email_code_expired",
@@ -342,12 +353,12 @@ function createEmailExpiryPatch(snapshot: CanvasSnapshot): AgentPatch {
     operations.push({ op: "deleteEdge", id: "edge_email_complete" });
   }
   operations.push({
-      op: "insertAfter",
-      anchorId: "node_email_verify",
-      blocks: emailBlocks,
-      edges: emailEdges,
-      layoutScope: "branch",
-    });
+    op: "insertAfter",
+    anchorId: "node_email_verify",
+    blocks: emailBlocks,
+    edges: emailEdges,
+    layoutScope: "branch",
+  });
 
   return {
     id: createId("patch_email_expiry"),
@@ -369,19 +380,51 @@ function createUnsupportedPatch(
   snapshot: CanvasSnapshot,
   prompt: string,
 ): AgentPatch {
+  return createNoOpPatch(snapshot, "记录暂不支持的指令", `暂不支持该指令：${prompt}`);
+}
+
+function createRollbackTestPatch(snapshot: CanvasSnapshot): AgentPatch {
   return {
-    id: createId("patch_note"),
-    description: "记录暂不支持的指令",
+    id: createId("patch_invalid_anchor"),
+    description: "测试失败回滚",
     baseVersion: snapshot.version,
-    affectedBlockIds: [],
+    affectedBlockIds: ["node_rollback_probe"],
     operations: [
       {
-        op: "batch",
-        operations: [],
+        op: "insertAfter",
+        anchorId: "node_missing_anchor",
+        blocks: [
+          createFlowNode({
+            id: "node_rollback_probe",
+            semanticId: "rollback.probe",
+            label: "不应出现的回滚节点",
+            description: "该节点用于验证 invalid patch 会被回滚",
+            semanticRole: "error",
+            position: { x: 420, y: 420 },
+          }),
+        ],
+        edges: [],
+        layoutScope: "local",
       },
     ],
     createdAt: now(),
-    summary: `暂不支持该指令：${prompt}`,
+    summary: "将提交一个非法 anchor patch，用于演示失败回滚。",
+  };
+}
+
+function createNoOpPatch(
+  snapshot: CanvasSnapshot,
+  description: string,
+  summary: string,
+): AgentPatch {
+  return {
+    id: createId("patch_noop"),
+    description,
+    baseVersion: snapshot.version,
+    affectedBlockIds: [],
+    operations: [],
+    createdAt: now(),
+    summary,
   };
 }
 

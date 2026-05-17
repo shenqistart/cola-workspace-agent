@@ -89,6 +89,10 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => {
       write((state) => {
         state.agent.status = "thinking";
         state.agent.error = undefined;
+        state.agent.currentPatch = undefined;
+        state.agent.currentPatchId = undefined;
+        state.agent.currentPatchDescription = undefined;
+        state.agent.activeOperations = [];
       });
 
       try {
@@ -99,6 +103,16 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => {
           content: patch.summary ?? patch.description,
           createdAt: now(),
         });
+        if (patch.operations.length === 0) {
+          write((state) => {
+            state.agent.status = "idle";
+            state.agent.currentPatch = undefined;
+            state.agent.currentPatchId = undefined;
+            state.agent.currentPatchDescription = undefined;
+            state.agent.activeOperations = [];
+          });
+          return;
+        }
         await get().applyAgentPatchWithRollback(patch);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown agent error";
@@ -117,12 +131,6 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => {
 
     applyAgentPatchWithRollback: async (patch: AgentPatch) => {
       const before = cloneSnapshot(get().canvas);
-      const validation = validateAgentPatch(patch, before);
-
-      if (!validation.ok) {
-        throw new Error(validation.errors.join("\n"));
-      }
-
       const pending: Transaction = {
         id: createId("tx_agent"),
         before,
@@ -135,6 +143,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => {
       write((state) => {
         state.pendingTransaction = pending;
         state.agent.status = "applying";
+        state.agent.currentPatch = patch;
         state.agent.currentPatchId = patch.id;
         state.agent.currentPatchDescription = patch.description;
         state.agent.activeOperations = [];
@@ -142,6 +151,11 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => {
       });
 
       try {
+        const validation = validateAgentPatch(patch, before);
+        if (!validation.ok) {
+          throw new Error(validation.errors.join("\n"));
+        }
+
         for (const operation of patch.operations) {
           const nextCanvas = applyPatchOperation(get().canvas, operation, "agent");
           write((state) => {
@@ -170,6 +184,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => {
             createdAt: now(),
           });
           state.agent.status = "idle";
+          state.agent.currentPatch = undefined;
           state.agent.activeOperations = [];
           state.agent.currentPatchId = undefined;
           state.agent.currentPatchDescription = undefined;
@@ -190,8 +205,9 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => {
           state.agent.status = "failed";
           state.agent.error = message;
           state.agent.activeOperations = [];
-          state.agent.currentPatchId = undefined;
-          state.agent.currentPatchDescription = undefined;
+          state.agent.currentPatch = patch;
+          state.agent.currentPatchId = patch.id;
+          state.agent.currentPatchDescription = patch.description;
         });
         throw error;
       }

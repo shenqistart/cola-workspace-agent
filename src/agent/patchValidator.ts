@@ -106,6 +106,10 @@ function validateOperation(
       validateInsertAfter(operation, context, path);
       break;
     case "batch":
+      if (operation.operations.length === 0) {
+        context.errors.push(`${path}: batch must contain at least one operation.`);
+        break;
+      }
       operation.operations.forEach((childOperation, childIndex) => {
         validateOperation(childOperation, context, `${path}.operations[${childIndex}]`);
       });

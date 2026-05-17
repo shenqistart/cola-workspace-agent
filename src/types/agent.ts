@@ -1,4 +1,4 @@
-import type { PatchOperation } from "../agent/patchProtocol";
+import type { AgentPatch, PatchOperation } from "../agent/patchProtocol";
 
 export type AgentStatus = "idle" | "thinking" | "applying" | "failed";
 
@@ -22,6 +22,7 @@ export interface AgentRuntimeState {
   status: AgentStatus;
   messages: ChatMessage[];
   activeOperations: PatchOperation[];
+  currentPatch?: AgentPatch;
   currentPatchId?: string;
   currentPatchDescription?: string;
   error?: string;
