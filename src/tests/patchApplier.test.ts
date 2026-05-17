@@ -42,6 +42,32 @@ describe("agent patch transaction history", () => {
     expect(useCanvasStore.getState().undoStack).toHaveLength(1);
   });
 
+  it("does not create a user transaction when drag position is unchanged", async () => {
+    const node = createFlowNode({
+      id: "node_noop_drag",
+      label: "不移动节点",
+      semanticRole: "action",
+      position: { x: 80, y: 120 },
+    });
+
+    const patch: AgentPatch = {
+      id: "patch_noop_drag_seed",
+      description: "Create node for no-op drag",
+      baseVersion: 0,
+      affectedBlockIds: [node.id],
+      operations: [{ op: "createBlock", block: node }],
+      createdAt: Date.now(),
+    };
+
+    await useCanvasStore.getState().applyAgentPatchWithRollback(patch);
+    expect(useCanvasStore.getState().undoStack).toHaveLength(1);
+
+    useCanvasStore.getState().dragBlock(node.id, node.position);
+
+    expect(useCanvasStore.getState().undoStack).toHaveLength(1);
+    expect(useCanvasStore.getState().canvas.blocks[node.id]).toEqual(node);
+  });
+
   it("applies the phone retry patch without deleting the completion node", async () => {
     const initial = createEmptyCanvasSnapshot();
     const registrationPatch = await createMockAgentPatch(

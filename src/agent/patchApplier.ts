@@ -181,6 +181,7 @@ function moveBlock(
     draft.manualLayoutMap[id] = {
       blockId: id,
       position,
+      reason: "drag",
       updatedAt: timestamp,
       updatedBy: "user",
     };

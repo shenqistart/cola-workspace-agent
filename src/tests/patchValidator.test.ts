@@ -102,4 +102,103 @@ describe("patch validator", () => {
       );
     }
   });
+
+  it("rejects createBlock when the block is a flowEdge", () => {
+    const snapshot = createEmptyCanvasSnapshot();
+    const start = createFlowNode({
+      id: "node_start",
+      label: "开始",
+      semanticRole: "start",
+      position: { x: 0, y: 0 },
+    });
+    const next = createFlowNode({
+      id: "node_next",
+      label: "下一步",
+      semanticRole: "action",
+      position: { x: 260, y: 0 },
+    });
+    snapshot.blocks[start.id] = start;
+    snapshot.blocks[next.id] = next;
+    snapshot.blockOrder.push(start.id, next.id);
+
+    const patch: AgentPatch = {
+      id: "patch_create_edge_as_block",
+      description: "Invalid createBlock edge",
+      baseVersion: snapshot.version,
+      affectedBlockIds: ["edge_start_next"],
+      operations: [
+        {
+          op: "createBlock",
+          block: createFlowEdge({
+            id: "edge_start_next",
+            source: start.id,
+            target: next.id,
+          }),
+        },
+      ],
+      createdAt: Date.now(),
+    };
+
+    const result = validateAgentPatch(patch, snapshot);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.join("\n")).toContain(
+        "createBlock cannot create flowEdge",
+      );
+    }
+  });
+
+  it("rejects insertAfter when the anchor is an edge", () => {
+    const snapshot = createEmptyCanvasSnapshot();
+    const start = createFlowNode({
+      id: "node_start",
+      label: "开始",
+      semanticRole: "start",
+      position: { x: 0, y: 0 },
+    });
+    const next = createFlowNode({
+      id: "node_next",
+      label: "下一步",
+      semanticRole: "action",
+      position: { x: 260, y: 0 },
+    });
+    const edge = createFlowEdge({
+      id: "edge_start_next",
+      source: start.id,
+      target: next.id,
+    });
+    snapshot.blocks[start.id] = start;
+    snapshot.blocks[next.id] = next;
+    snapshot.blocks[edge.id] = edge;
+    snapshot.blockOrder.push(start.id, next.id, edge.id);
+
+    const inserted = createFlowNode({
+      id: "node_inserted",
+      label: "插入节点",
+      semanticRole: "action",
+      position: { x: 520, y: 0 },
+    });
+    const patch: AgentPatch = {
+      id: "patch_edge_anchor",
+      description: "Invalid edge anchor",
+      baseVersion: snapshot.version,
+      affectedBlockIds: [inserted.id],
+      operations: [
+        {
+          op: "insertAfter",
+          anchorId: edge.id,
+          blocks: [inserted],
+          edges: [],
+          layoutScope: "local",
+        },
+      ],
+      createdAt: Date.now(),
+    };
+
+    const result = validateAgentPatch(patch, snapshot);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.join("\n")).toContain("must reference a node, not an edge");
+    }
+  });
 });

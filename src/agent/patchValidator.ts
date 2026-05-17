@@ -132,12 +132,13 @@ function validateCreateBlock(
     return;
   }
 
-  context.availableIds.add(block.id);
   if (block.type === "flowEdge") {
-    context.edgeIds.add(block.id);
-  } else {
-    context.nodeIds.add(block.id);
+    context.errors.push(`${path}: createBlock cannot create flowEdge; use createEdge instead.`);
+    return;
   }
+
+  context.availableIds.add(block.id);
+  context.nodeIds.add(block.id);
 }
 
 function validateCreateEdge(
@@ -175,6 +176,10 @@ function validateInsertAfter(
 ) {
   if (!context.availableIds.has(operation.anchorId)) {
     context.errors.push(`${path}: anchorId "${operation.anchorId}" does not exist.`);
+  } else if (!context.nodeIds.has(operation.anchorId)) {
+    context.errors.push(
+      `${path}: anchorId "${operation.anchorId}" must reference a node, not an edge.`,
+    );
   }
 
   operation.blocks.forEach((block, index) => {

@@ -2,15 +2,33 @@ import { FileJson2 } from "lucide-react";
 import type { AgentPatch, PatchOperation } from "../agent/patchProtocol";
 import { describeOperation } from "../agent/patchProtocol";
 import { useCanvasStore } from "../store/useCanvasStore";
+import type { PatchLogEntry } from "../types/agent";
+import type { CanvasBlock } from "../types/canvas";
 import { isPositionedBlock } from "../types/canvas";
+
+interface PatchPreviewData {
+  id: string;
+  description: string;
+  affectedBlockIds: string[];
+  operations: PatchOperation[];
+  status: "applying" | PatchLogEntry["status"];
+}
+
+type OperationStatus = "applied" | "pending" | "rolled back";
 
 export function PatchPreview() {
   const currentPatch = useCanvasStore((state) => state.agent.currentPatch);
-  const operations = useCanvasStore((state) => state.agent.activeOperations);
+  const activeOperations = useCanvasStore((state) => state.agent.activeOperations);
+  const latestPatchLog = useCanvasStore((state) => state.patchLog[0]);
   const canvas = useCanvasStore((state) => state.canvas);
   const error = useCanvasStore((state) => state.agent.error);
-  const preservedManualLayout = currentPatch
-    ? hasRelatedUserLayout(currentPatch, canvas.blocks)
+  const preview = currentPatch
+    ? agentPatchToPreview(currentPatch)
+    : latestPatchLog
+      ? patchLogEntryToPreview(latestPatchLog)
+      : undefined;
+  const preservedManualLayout = preview
+    ? hasRelatedUserLayout(preview.operations, canvas.blocks)
     : false;
 
   return (
@@ -26,32 +44,37 @@ export function PatchPreview() {
         </div>
       ) : null}
 
-      {!currentPatch && !error ? (
+      {!preview && !error ? (
         <p className="text-sm leading-5 text-[#63718a]">
-          当前没有正在应用的 patch。提交指令后会展示逐条 operation。
+          当前没有可预览的 patch。提交指令后会展示逐条 operation。
         </p>
       ) : null}
 
-      {currentPatch ? (
+      {preview ? (
         <div className="rounded-md border border-[#d8e0ec] bg-[#f7f9fc] p-3">
-          <div className="break-all text-xs uppercase tracking-normal text-[#63718a]">
-            {currentPatch.id}
+          <div className="flex items-start justify-between gap-2">
+            <div className="break-all text-xs uppercase tracking-normal text-[#63718a]">
+              {preview.id}
+            </div>
+            <span className="rounded border border-[#d8e0ec] bg-white px-1.5 py-0.5 text-[11px] uppercase tracking-normal text-[#63718a]">
+              {preview.status}
+            </span>
           </div>
           <div className="mt-1 text-sm font-semibold leading-5 text-[#26344d]">
-            {currentPatch.description}
+            {preview.description}
           </div>
-          <KeyList title="Affected blocks" values={currentPatch.affectedBlockIds} />
+          <KeyList title="Affected blocks" values={preview.affectedBlockIds} />
           {preservedManualLayout ? (
             <div className="mt-3 rounded-md border border-[#b7dfc7] bg-[#f1fbf4] px-2 py-1.5 text-xs leading-5 text-[#315d3d]">
               已保留用户手动布局
             </div>
           ) : null}
           <div className="mt-3 space-y-2">
-            {currentPatch.operations.map((operation, index) => (
+            {preview.operations.map((operation, index) => (
               <OperationCard
                 key={`${operation.op}-${index}`}
                 operation={operation}
-                applied={operations.includes(operation)}
+                status={getOperationStatus(preview, operation, activeOperations)}
               />
             ))}
           </div>
@@ -63,17 +86,17 @@ export function PatchPreview() {
 
 function OperationCard({
   operation,
-  applied,
+  status,
 }: {
   operation: PatchOperation;
-  applied: boolean;
+  status: OperationStatus;
 }) {
   return (
     <div className="rounded-md bg-white px-2 py-2 text-xs text-[#40506a]">
       <div className="flex items-center justify-between gap-2">
         <span className="font-semibold text-[#26344d]">{describeOperation(operation)}</span>
-        <span className={applied ? "text-[#3f7d4b]" : "text-[#91a4bd]"}>
-          {applied ? "applied" : "pending"}
+        <span className={status === "applied" ? "text-[#3f7d4b]" : "text-[#91a4bd]"}>
+          {status}
         </span>
       </div>
       {operation.op === "insertAfter" ? (
@@ -112,11 +135,47 @@ function KeyList({ title, values }: { title: string; values: string[] }) {
   );
 }
 
+function agentPatchToPreview(patch: AgentPatch): PatchPreviewData {
+  return {
+    id: patch.id,
+    description: patch.description,
+    affectedBlockIds: patch.affectedBlockIds,
+    operations: patch.operations,
+    status: "applying",
+  };
+}
+
+function patchLogEntryToPreview(entry: PatchLogEntry): PatchPreviewData {
+  return {
+    id: entry.patchId,
+    description: entry.description,
+    affectedBlockIds: entry.affectedBlockIds,
+    operations: entry.operations,
+    status: entry.status,
+  };
+}
+
+function getOperationStatus(
+  preview: PatchPreviewData,
+  operation: PatchOperation,
+  activeOperations: PatchOperation[],
+): OperationStatus {
+  if (preview.status === "committed") {
+    return "applied";
+  }
+
+  if (preview.status === "rolled_back") {
+    return "rolled back";
+  }
+
+  return activeOperations.includes(operation) ? "applied" : "pending";
+}
+
 function hasRelatedUserLayout(
-  patch: AgentPatch,
-  blocks: ReturnType<typeof useCanvasStore.getState>["canvas"]["blocks"],
+  operations: PatchOperation[],
+  blocks: Record<string, CanvasBlock>,
 ) {
-  return getRelatedBlockIds(patch.operations).some((id) => {
+  return getRelatedBlockIds(operations).some((id) => {
     const block = blocks[id];
     return isPositionedBlock(block) && block.positionSource === "user";
   });

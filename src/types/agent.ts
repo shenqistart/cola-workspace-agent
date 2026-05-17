@@ -13,6 +13,7 @@ export interface PatchLogEntry {
   id: string;
   patchId: string;
   description: string;
+  affectedBlockIds: string[];
   operations: PatchOperation[];
   status: "committed" | "rolled_back";
   createdAt: number;

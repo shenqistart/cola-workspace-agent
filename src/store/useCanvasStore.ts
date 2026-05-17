@@ -7,6 +7,7 @@ import { validateAgentPatch } from "../agent/patchValidator";
 import { createMockAgentPatch } from "../agent/mockAgent";
 import type { AgentRuntimeState, ChatMessage, PatchLogEntry } from "../types/agent";
 import type { CanvasSnapshot, Point } from "../types/canvas";
+import { isPositionedBlock } from "../types/canvas";
 import type { Transaction } from "../types/history";
 import { cloneSnapshot } from "../utils/diff";
 import { createId } from "../utils/ids";
@@ -179,6 +180,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => {
             id: createId("patch_log"),
             patchId: patch.id,
             description: patch.description,
+            affectedBlockIds: patch.affectedBlockIds,
             operations: patch.operations,
             status: "committed",
             createdAt: now(),
@@ -198,6 +200,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => {
             id: createId("patch_log"),
             patchId: patch.id,
             description: patch.description,
+            affectedBlockIds: patch.affectedBlockIds,
             operations: patch.operations,
             status: "rolled_back",
             createdAt: now(),
@@ -216,6 +219,9 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => {
     dragBlock: (id: string, position: Point) => {
       const before = cloneSnapshot(get().canvas);
       const block = before.blocks[id];
+      if (!isPositionedBlock(block) || arePointsEqual(block.position, position)) {
+        return;
+      }
       const label = block && "label" in block ? `移动 ${block.label}` : `移动 ${id}`;
       const operation: PatchOperation = {
         op: "moveBlock",
@@ -305,6 +311,10 @@ function getStreamDelayMs() {
 
 function areStringArraysEqual(left: string[], right: string[]) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function arePointsEqual(left: Point, right: Point) {
+  return left.x === right.x && left.y === right.y;
 }
 
 export { describeOperation };

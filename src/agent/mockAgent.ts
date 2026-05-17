@@ -368,7 +368,6 @@ function createEmailExpiryPatch(snapshot: CanvasSnapshot): AgentPatch {
       "node_email_verify",
       "node_email_code_expired",
       "node_email_resend_code",
-      "node_complete",
     ],
     operations,
     createdAt: now(),

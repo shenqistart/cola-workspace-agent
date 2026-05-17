@@ -97,6 +97,7 @@ export type CanvasBlock =
 export interface ManualLayoutRecord {
   blockId: string;
   position: Point;
+  reason: "drag" | "resize" | "lock";
   updatedAt: number;
   updatedBy: "user";
 }

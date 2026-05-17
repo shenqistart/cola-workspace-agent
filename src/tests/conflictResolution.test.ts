@@ -20,6 +20,7 @@ describe("layout conflict resolution", () => {
     snapshot.manualLayoutMap[phoneNode.id] = {
       blockId: phoneNode.id,
       position: phoneNode.position,
+      reason: "drag",
       updatedAt: Date.now(),
       updatedBy: "user",
     };
